@@ -63,14 +63,28 @@ const useDarkMode = () => {
   useEffect(() => {
     setMounted(true);
     
-    // PERBAIKAN: Cek apakah window tersedia (client-side)
     if (typeof window !== 'undefined') {
-      // Cek preferensi user
-      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      setDarkMode(prefersDark);
+      // Cek localStorage untuk preferensi yang sudah disimpan
+      const savedDarkMode = localStorage.getItem('seija-dark-mode');
       
-      if (prefersDark) {
-        document.documentElement.classList.add('dark');
+      if (savedDarkMode !== null) {
+        // Gunakan preferensi yang sudah disimpan
+        const isDarkMode = savedDarkMode === 'true';
+        setDarkMode(isDarkMode);
+        
+        if (isDarkMode) {
+          document.documentElement.classList.add('dark');
+        } else {
+          document.documentElement.classList.remove('dark');
+        }
+      } else {
+        // Jika belum ada preferensi, gunakan preferensi sistem
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        setDarkMode(prefersDark);
+        
+        if (prefersDark) {
+          document.documentElement.classList.add('dark');
+        }
       }
     }
   }, []);
@@ -79,7 +93,10 @@ const useDarkMode = () => {
     const newDarkMode = !darkMode;
     setDarkMode(newDarkMode);
     
-    if (typeof document !== 'undefined') {
+    if (typeof window !== 'undefined') {
+      // Simpan preferensi ke localStorage
+      localStorage.setItem('seija-dark-mode', newDarkMode.toString());
+      
       if (newDarkMode) {
         document.documentElement.classList.add('dark');
       } else {
@@ -243,6 +260,9 @@ const App: React.FC = () => {
 
   const handleLogout = () => {
     logout();
+    if (typeof window !== 'undefined') {
+      window.location.href = '/';
+    }
   };
 
   if (!mounted) {
