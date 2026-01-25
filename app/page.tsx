@@ -4,184 +4,77 @@ import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
 
-// ============== SIMULASI CONTEXT (KARENA FILE TIDAK ADA) ==============
-// Buat hooks sederhana jika context file tidak ada
-const useAuth = () => {
-  const [user, setUser] = useState<any>(null);
-  
-  const login = () => {
-    setUser({
-      id: 1,
-      username: "demo",
-      email: "demo@seija.com",
-      role: "user"
-    });
-  };
-  
-  const logout = () => {
-    setUser(null);
-  };
-  
-  return { user, login, logout };
-};
+// ============== IMPORT REAL CONTEXTS ==============
+import { useAuth } from "./contexts/AuthContext";
+import { useDarkMode } from "./hooks/useDarkMode";
+// ============== END IMPORT ==============
 
-const useArticles = () => {
-  const [loading, setLoading] = useState(false);
-  const [articles, setArticles] = useState<any[]>([]);
-  
-  const fetchArticles = () => {
-    setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-    }, 1000);
-  };
-  
-  const likeArticle = async (id: number) => {
-    return true;
-  };
-  
-  const updateFilters = (filters: any) => {
-    console.log("Update filters:", filters);
-  };
-  
-  return {
-    articles,
-    loading,
-    featuredArticles: [],
-    trendingArticles: [],
-    categories: [],
-    fetchArticles,
-    likeArticle,
-    updateFilters
-  };
-};
-
-const useDarkMode = () => {
-  const [darkMode, setDarkMode] = useState(false);
-  const [mounted, setMounted] = useState(false);
-  
-  useEffect(() => {
-    setMounted(true);
-    
-    if (typeof window !== 'undefined') {
-      // Cek localStorage untuk preferensi yang sudah disimpan
-      const savedDarkMode = localStorage.getItem('seija-dark-mode');
-      
-      if (savedDarkMode !== null) {
-        // Gunakan preferensi yang sudah disimpan
-        const isDarkMode = savedDarkMode === 'true';
-        setDarkMode(isDarkMode);
-        
-        if (isDarkMode) {
-          document.documentElement.classList.add('dark');
-        } else {
-          document.documentElement.classList.remove('dark');
-        }
-      } else {
-        // Jika belum ada preferensi, gunakan preferensi sistem
-        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-        setDarkMode(prefersDark);
-        
-        if (prefersDark) {
-          document.documentElement.classList.add('dark');
-        }
-      }
-    }
-  }, []);
-  
-  const toggleDarkMode = () => {
-    const newDarkMode = !darkMode;
-    setDarkMode(newDarkMode);
-    
-    if (typeof window !== 'undefined') {
-      // Simpan preferensi ke localStorage
-      localStorage.setItem('seija-dark-mode', newDarkMode.toString());
-      
-      if (newDarkMode) {
-        document.documentElement.classList.add('dark');
-      } else {
-        document.documentElement.classList.remove('dark');
-      }
-    }
-  };
-  
-  return { darkMode, toggleDarkMode, mounted };
-};
-// ============== END SIMULASI CONTEXT ==============
+// Fallback articles data (gunakan ini jika ArticleContext belum ada)
+const fallbackArticles = [
+  {
+    id: 1,
+    title: "Laut",
+    excerpt: "Bayangkan, aku dan kau menikmati deburan ombak Duduk di pasir yang hangat",
+    author: "Drupadi Prameswari Ikhwan",
+    author_name: "Drupadi Prameswari Ikhwan",
+    category: "Puisi",
+    category_name: "Puisi",
+    readTime: "3 min read",
+    date: "Jan 15, 2024",
+    likes: 167,
+    like_count: 167,
+    comments: 31,
+    comment_count: 31,
+    view_count: 342,
+    cover_image: "/cover/Laut.jpg"
+  },
+  {
+    id: 2,
+    title: "Dirimu",
+    excerpt: "Ketika sang surya telah tenggelam di dalam nisha Dan purnama pun menghiasi malam yang menyiksa",
+    author: "Febiana Nur Hidayah",
+    author_name: "Febiana Nur Hidayah",
+    category: "Puisi",
+    category_name: "Puisi",
+    readTime: "8 min read", 
+    date: "Jan 12, 2024",
+    likes: 142,
+    like_count: 142,
+    comments: 23,
+    comment_count: 23,
+    view_count: 256,
+    cover_image: "/cover/dirimu.jpeg"
+  },
+  {
+    id: 3,
+    title: "Pohon",
+    excerpt: "Pohon setelah terluka Tak akan menunggu permintaan maaf",
+    author: "Raykenzie Nazaru F",
+    author_name: "Raykenzie Nazaru F",
+    category: "Puisi",
+    category_name: "Puisi",
+    readTime: "6 min read",
+    date: "Jan 10, 2024", 
+    likes: 203,
+    like_count: 203,
+    comments: 42,
+    comment_count: 42,
+    view_count: 321,
+    cover_image: "/cover/pohon.jpg"
+  }
+];
 
 const App: React.FC = () => {
   const [currentSlide, setCurrentSlide] = useState(0);
-  const { user, logout } = useAuth();
-  const { 
-    articles, 
-    loading, 
-    featuredArticles, 
-    trendingArticles,
-    categories: contextCategories,
-    fetchArticles, 
-    likeArticle,
-    updateFilters 
-  } = useArticles();
-  const { darkMode, toggleDarkMode, mounted } = useDarkMode();
+  
+  // ============== USE REAL CONTEXTS ==============
+  const { user, logout } = useAuth(); // PAKAI REAL AUTH CONTEXT
+  const { darkMode, toggleDarkMode, mounted } = useDarkMode(); // PAKAI REAL DARK MODE
+  // ============== END REAL CONTEXTS ==============
 
-  // Data fallback dengan struktur yang konsisten
-  const fallbackArticles = [
-    {
-      id: 1,
-      title: "Laut",
-      excerpt: "Bayangkan, aku dan kau menikmati deburan ombak Duduk di pasir yang hangat",
-      author: "Drupadi Prameswari Ikhwan",
-      author_name: "Drupadi Prameswari Ikhwan",
-      category: "Puisi",
-      category_name: "Puisi",
-      readTime: "3 min read",
-      date: "Jan 15, 2024",
-      likes: 167,
-      like_count: 167,
-      comments: 31,
-      comment_count: 31,
-      view_count: 342,
-      cover_image: "/cover/Laut.jpg"
-    },
-    {
-      id: 2,
-      title: "Dirimu",
-      excerpt: "Ketika sang surya telah tenggelam di dalam nisha Dan purnama pun menghiasi malam yang menyiksa",
-      author: "Febiana Nur Hidayah",
-      author_name: "Febiana Nur Hidayah",
-      category: "Puisi",
-      category_name: "Puisi",
-      readTime: "8 min read", 
-      date: "Jan 12, 2024",
-      likes: 142,
-      like_count: 142,
-      comments: 23,
-      comment_count: 23,
-      view_count: 256,
-      cover_image: "/cover/dirimu.jpeg"
-    },
-    {
-      id: 3,
-      title: "Pohon",
-      excerpt: "Pohon setelah terluka Tak akan menunggu permintaan maaf",
-      author: "Raykenzie Nazaru F",
-      author_name: "Raykenzie Nazaru F",
-      category: "Puisi",
-      category_name: "Puisi",
-      readTime: "6 min read",
-      date: "Jan 10, 2024", 
-      likes: 203,
-      like_count: 203,
-      comments: 42,
-      comment_count: 42,
-      view_count: 321,
-      cover_image: "/cover/pohon.jpg"
-    }
-  ];
-
-  // Gunakan articles dari context atau fallback data
-  const displayFeaturedArticles = featuredArticles.length > 0 ? featuredArticles : fallbackArticles;
-  const displayTrendingArticles = trendingArticles.length > 0 ? trendingArticles : fallbackArticles.slice(0, 3);
+  // Use fallback articles untuk sekarang
+  const displayFeaturedArticles = fallbackArticles;
+  const displayTrendingArticles = fallbackArticles.slice(0, 3);
 
   const categories = [
     { name: "Novel", icon: "📚", count: "24", color: "bg-blue-600", slug: "novel" },
@@ -235,9 +128,7 @@ const App: React.FC = () => {
   };
 
   const handleCategoryClick = (categorySlug: string) => {
-    updateFilters({ category: categorySlug });
     // Navigate to explore page with category filter
-    // PERBAIKAN: Gunakan Link dari Next.js atau cek window tersedia
     if (typeof window !== 'undefined') {
       window.location.href = `/explore?category=${categorySlug}`;
     }
@@ -251,11 +142,9 @@ const App: React.FC = () => {
       alert('Please login to like articles');
       return;
     }
-
-    const success = await likeArticle(articleId);
-    if (success) {
-      console.log('Article liked successfully');
-    }
+    
+    // TODO: Implement like functionality
+    console.log('Liking article:', articleId);
   };
 
   const handleLogout = () => {
@@ -276,23 +165,12 @@ const App: React.FC = () => {
     );
   }
 
-  if (loading && articles.length === 0) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading content...</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className={`min-h-screen transition-colors duration-300 ${
       darkMode ? 'bg-gray-900 text-white' : 'bg-white text-gray-900'
     }`}>
       
-      {/* Navigation Bar - FIXED */}
+      {/* Navigation Bar - FIXED DENGAN REAL USER */}
       <nav className={`fixed top-0 w-full z-50 backdrop-blur-md border-b ${
         darkMode ? 'bg-gray-900/80 border-gray-700' : 'bg-white/80 border-gray-200'
       }`}>
@@ -342,7 +220,7 @@ const App: React.FC = () => {
               })}
             </div>
 
-            {/* Right Section - FIXED */}
+            {/* Right Section - FIXED DENGAN REAL USER */}
             <div className="flex items-center space-x-4">
               {/* Dark Mode Toggle */}
               <button
@@ -354,7 +232,7 @@ const App: React.FC = () => {
                 {darkMode ? '☀️' : '🌙'}
               </button>
 
-              {/* Auth Section - FIXED */}
+              {/* Auth Section - FIXED DENGAN REAL USER */}
               {user ? (
                 <div className="flex items-center space-x-3">
                   {/* Tombol Create untuk semua user yang login */}
@@ -377,7 +255,7 @@ const App: React.FC = () => {
                     <Link href="/profile" className="block">
                       <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center cursor-pointer hover:bg-blue-700 transition-colors">
                         <span className="text-white text-sm font-bold">
-                          {user.username?.charAt(0).toUpperCase()}
+                          {user.username?.charAt(0).toUpperCase() || 'U'}
                         </span>
                       </div>
                     </Link>
@@ -388,7 +266,7 @@ const App: React.FC = () => {
                     }`}>
                       <div className="px-4 py-2 border-b border-gray-200 dark:border-gray-700">
                         <p className="text-sm font-medium">Signed in as</p>
-                        <p className="text-sm text-gray-500 truncate">{user.email}</p>
+                        <p className="text-sm text-gray-500 truncate">{user.email || 'user@example.com'}</p>
                       </div>
                       <Link
                         href="/profile"
@@ -449,7 +327,11 @@ const App: React.FC = () => {
                 <p className={`text-xl mt-6 leading-relaxed ${
                   darkMode ? 'text-gray-300' : 'text-gray-600'
                 }`}>
-                  Discover, create, and share amazing content. Join our community of student writers, designers, and developers showcasing their talents.
+                  {user ? (
+                    `Welcome back, ${user.username}! Discover, create, and share amazing content with our community.`
+                  ) : (
+                    'Discover, create, and share amazing content. Join our community of student writers, designers, and developers showcasing their talents.'
+                  )}
                 </p>
               </div>
 
@@ -475,9 +357,9 @@ const App: React.FC = () => {
               {/* Stats */}
               <div className="grid grid-cols-3 gap-8 pt-8">
                 {[
-                  { number: articles.length > 0 ? articles.length.toString() + "+" : "3", label: "Published Works" },
+                  { number: fallbackArticles.length + "+", label: "Published Works" },
                   { number: "35", label: "Creative Students" },
-                  { number: categories.length.toString() + "+", label: "Categories" }
+                  { number: categories.length + "+", label: "Categories" }
                 ].map((stat, index) => (
                   <div key={index} className="text-center">
                     <div className="text-2xl font-bold bg-blue-600 bg-clip-text text-transparent">
@@ -613,7 +495,11 @@ const App: React.FC = () => {
               <p className={`text-xl ${
                 darkMode ? 'text-gray-300' : 'text-gray-600'
               }`}>
-                Handpicked content from our talented community
+                {user ? (
+                  `Welcome back, ${user.username}! Here are some handpicked articles for you.`
+                ) : (
+                  'Handpicked content from our talented community'
+                )}
               </p>
             </div>
             <Link
@@ -793,12 +679,19 @@ const App: React.FC = () => {
             }`}
           >
             <h2 className="text-4xl font-bold mb-6">
-              Ready to Share Your <span className="bg-blue-600 bg-clip-text text-transparent">Creativity</span>?
+              {user ? `Welcome, ${user.username}!` : 'Ready to Share Your '}
+              <span className="bg-blue-600 bg-clip-text text-transparent">
+                {user ? ' What will you create today?' : ' Creativity?'}
+              </span>
             </h2>
             <p className={`text-xl mb-8 max-w-2xl mx-auto ${
               darkMode ? 'text-gray-300' : 'text-gray-600'
             }`}>
-              Join hundreds of students showcasing their work, building their portfolio, and connecting with like-minded creators.
+              {user ? (
+                `You're part of our creative community. Continue building your portfolio and connecting with other creators.`
+              ) : (
+                'Join hundreds of students showcasing their work, building their portfolio, and connecting with like-minded creators.'
+              )}
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link
