@@ -1,6 +1,6 @@
-// contexts/AuthContext.tsx - FIXED
 'use client';
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { getSupabase } from '@/lib/supabase';
 
 export interface User {
   id: string;
@@ -24,71 +24,84 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
-
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [supabase, setSupabase] = useState<any>(null);
 
-  // Check for existing session on mount
+  // Initialize on client-side only
   useEffect(() => {
-    const checkAuth = () => {
-      try {
-        const token = localStorage.getItem('token');
-        const userStr = localStorage.getItem('user');
-        
-        if (token && userStr) {
-          const userData = JSON.parse(userStr);
-          setUser(userData);
-          console.log('✅ User session restored:', userData.username);
-        }
-      } catch (error) {
-        console.error('Error restoring session:', error);
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-      }
-    };
-
-    checkAuth();
+    const client = getSupabase();
+    setSupabase(client);
+    
+    if (client) {
+      checkAuth(client);
+    } else {
+      setIsLoading(false);
+    }
   }, []);
 
+  const checkAuth = async (client: any) => {
+    try {
+      const { data: { session } } = await client.auth.getSession();
+      
+      if (session?.user) {
+        const { data: userData } = await client
+          .from('users')
+          .select('*')
+          .eq('id', session.user.id)
+          .single();
+        
+        if (userData) {
+          setUser(userData);
+          localStorage.setItem('user', JSON.stringify(userData));
+        }
+      }
+    } catch (error) {
+      console.error('Auth check error:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const login = async (email: string, password: string): Promise<boolean> => {
+    if (!supabase) {
+      setError('Auth service not available');
+      return false;
+    }
+
     try {
       setIsLoading(true);
       setError(null);
       
-      console.log('🔐 Login attempt for:', email);
-      
-      const response = await fetch(`${API_URL}/auth/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, password }),
+      const { data, error: authError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
       });
 
-      const data = await response.json();
-      console.log('📦 Login response:', data);
-
-      if (data.success && data.data) {
-        const { token, user: userData } = data.data;
-        
-        // Save to localStorage
-        localStorage.setItem('token', token);
-        localStorage.setItem('user', JSON.stringify(userData));
-        
-        setUser(userData);
-        console.log('✅ Login successful:', userData.username);
-        return true;
-      } else {
-        setError(data.message || 'Login failed');
-        console.error('❌ Login failed:', data.message);
+      if (authError) {
+        setError(authError.message);
         return false;
       }
-    } catch (error) {
-      console.error('❌ Login error:', error);
-      setError('Network error. Please try again.');
+
+      if (data.user) {
+        const { data: userData } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', data.user.id)
+          .single();
+        
+        if (userData) {
+          setUser(userData);
+          localStorage.setItem('user', JSON.stringify(userData));
+          return true;
+        }
+      }
+      
+      return false;
+    } catch (error: any) {
+      setError('Login failed');
       return false;
     } finally {
       setIsLoading(false);
@@ -96,45 +109,93 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const register = async (username: string, email: string, password: string): Promise<boolean> => {
+    if (!supabase) {
+      setError('Auth service not available');
+      return false;
+    }
+
     try {
       setIsLoading(true);
       setError(null);
       
-      console.log('📝 Register attempt for:', email);
+      console.log('Registering:', { username, email });
       
-      const response = await fetch(`${API_URL}/auth/register`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ username, email, password }),
-      });
-
-      const data = await response.json();
-      console.log('📦 Register response:', data);
-
-      if (data.success) {
-        console.log('✅ Registration successful');
-        return true;
-      } else {
-        setError(data.message || 'Registration failed');
-        console.error('❌ Registration failed:', data.message);
+      // 1. Check if user exists
+      const { data: existingUsers } = await supabase
+        .from('users')
+        .select('id')
+        .or(`email.eq.${email},username.eq.${username}`);
+      
+      if (existingUsers && existingUsers.length > 0) {
+        setError('User already exists');
         return false;
       }
-    } catch (error) {
-      console.error('❌ Registration error:', error);
-      setError('Network error. Please try again.');
+      
+      // 2. Create auth user
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email,
+        password,
+      });
+      
+      if (authError) throw authError;
+      if (!authData.user) throw new Error('No user created');
+      
+      console.log('Auth user created:', authData.user.id);
+      
+      // 3. Create profile
+      const { error: profileError } = await supabase
+        .from('users')
+        .insert({
+          id: authData.user.id,
+          username,
+          email,
+          role: 'user',
+          avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(username)}&background=random`,
+          created_at: new Date().toISOString()
+        });
+      
+      if (profileError) throw profileError;
+      
+      console.log('Profile created');
+      
+      // 4. Auto login
+      const { error: loginError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      
+      if (loginError) throw loginError;
+      
+      // 5. Get user data
+      const { data: userData } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', authData.user.id)
+        .single();
+      
+      if (userData) {
+        setUser(userData);
+        localStorage.setItem('user', JSON.stringify(userData));
+      }
+      
+      console.log('Registration complete!');
+      return true;
+      
+    } catch (error: any) {
+      console.error('Registration error:', error);
+      setError(error.message || 'Registration failed');
       return false;
     } finally {
       setIsLoading(false);
     }
   };
 
-  const logout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
+  const logout = async () => {
+    if (supabase) {
+      await supabase.auth.signOut();
+    }
     setUser(null);
-    console.log('👋 User logged out');
+    localStorage.removeItem('user');
   };
 
   const updateUser = (userData: Partial<User>) => {
