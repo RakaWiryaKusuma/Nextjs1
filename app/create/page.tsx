@@ -31,6 +31,69 @@ const defaultCovers: { [key: string]: string } = {
   'Pantun': '/cover/pantun.jpg'
 };
 
+// API Debug Utility
+const testApiConnection = async () => {
+  try {
+    console.log('🔍 Testing API connection...');
+    
+    // Test 1: Check if API is running
+    const healthResponse = await fetch('http://localhost:3001/api/health');
+    console.log('🏥 API Health:', healthResponse.status);
+    
+    // Test 2: Check articles endpoint
+    const articlesResponse = await fetch('http://localhost:3001/api/articles?limit=1');
+    const articlesData = await articlesResponse.json();
+    console.log('📚 Articles endpoint:', articlesData.success ? '✅ OK' : '❌ Failed');
+    
+    // Test 3: Check user token
+    const token = localStorage.getItem('token');
+    console.log('🔑 Token exists:', !!token);
+    
+    if (token) {
+      // Test 4: Try to create a test article
+      console.log('🧪 Testing article creation...');
+      
+      const testData = {
+        title: "Test Article from Debug",
+        content: "This is a test article for debugging purposes.",
+        excerpt: "Test article excerpt",
+        category_name: "Opini",
+        author_name: "Debug User",
+        cover_image: "/cover/default.jpg",
+        tags: "test,debug",
+        status: "published"
+      };
+      
+      try {
+        const testResponse = await fetch('http://localhost:3001/api/articles', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify(testData)
+        });
+        
+        const testResult = await testResponse.json();
+        console.log('🧪 Test creation result:', testResult);
+        
+        if (testResult.success) {
+          alert('✅ Test article created successfully!');
+        } else {
+          alert(`❌ Test failed: ${testResult.message}`);
+        }
+      } catch (testError) {
+        console.error('🧪 Test error:', testError);
+        alert('❌ Test connection failed');
+      }
+    }
+    
+  } catch (error) {
+    console.error('🔧 Debug error:', error);
+    alert('❌ Debug failed: ' + error);
+  }
+};
+
 export default function CreateArticlePage() {
   const router = useRouter();
   const { user } = useAuth();
@@ -51,6 +114,11 @@ export default function CreateArticlePage() {
   const [imagePreview, setImagePreview] = useState("");
   const [errors, setErrors] = useState<{[key: string]: string}>({});
   const [successMessage, setSuccessMessage] = useState("");
+  const [apiLogs, setApiLogs] = useState<string[]>([]);
+
+  const addLog = (message: string) => {
+    setApiLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] ${message}`]);
+  };
 
   // Validasi real-time
   const validateField = (name: string, value: string) => {
@@ -138,13 +206,12 @@ export default function CreateArticlePage() {
       setImagePreview(objectUrl);
 
       // Untuk sekarang, kita simpan path sementara
-      // Di production, Anda perlu upload file ke server terlebih dahulu
       setFormData(prev => ({ 
         ...prev, 
-        cover_image: `/uploads/${file.name}` // Path sementara
+        cover_image: `/uploads/${Date.now()}_${file.name}` // Path sementara
       }));
 
-      console.log('🖼️ Image selected:', file.name, 'Size:', file.size);
+      addLog(`🖼️ Gambar dipilih: ${file.name} (${Math.round(file.size / 1024)}KB)`);
     }
   };
 
@@ -176,6 +243,7 @@ export default function CreateArticlePage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSuccessMessage("");
+    setApiLogs([]);
     
     if (!validateForm()) {
       alert('Harap perbaiki error yang ditampilkan sebelum melanjutkan.');
@@ -184,13 +252,9 @@ export default function CreateArticlePage() {
 
     try {
       setIsSubmitting(true);
-      console.log('🚀 Submitting article...', {
-        title: formData.title,
-        category: formData.category_name,
-        content_length: formData.content.length
-      });
+      addLog('🚀 Memulai proses submit artikel...');
 
-      // Siapkan data untuk dikirim
+      // Siapkan data untuk dikirim - HARUS sesuai dengan struktur database
       const articleData = {
         title: formData.title.trim(),
         content: formData.content,
@@ -198,19 +262,46 @@ export default function CreateArticlePage() {
         category_name: formData.category_name,
         author_name: formData.author_name.trim() || user?.username,
         cover_image: formData.cover_image || defaultCovers[formData.category_name] || '/cover/default.jpg',
-        tags: formData.tags
+        tags: formData.tags,
+        status: user?.role === 'admin' ? 'published' : 'pending'
       };
 
-      console.log('📦 Data to send:', articleData);
+      addLog(`📦 Menyiapkan data: ${articleData.title}`);
+      addLog(`📊 Kategori: ${articleData.category_name}`);
+      addLog(`👤 Penulis: ${articleData.author_name}`);
 
-      const success = await createArticle(articleData);
+      // Debug token
+      const token = localStorage.getItem('token');
+      addLog(`🔑 Token tersedia: ${!!token}`);
+      
+      if (!token) {
+        throw new Error('Token tidak ditemukan. Silakan login ulang.');
+      }
 
-      if (success) {
-        setSuccessMessage(
-          user?.role === 'admin' 
-            ? '🎉 Karya berhasil dipublikasikan!' 
-            : '📝 Karya berhasil diajukan! Menunggu persetujuan admin.'
-        );
+      // Coba langsung fetch ke API untuk debugging
+      addLog('🔄 Mengirim ke API...');
+      
+      const response = await fetch('http://localhost:3001/api/articles', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(articleData)
+      });
+
+      addLog(`📡 Response status: ${response.status}`);
+      
+      const data = await response.json();
+      addLog(`📦 API Response: ${JSON.stringify(data)}`);
+
+      if (data.success) {
+        const message = user?.role === 'admin' 
+          ? '🎉 Karya berhasil dipublikasikan!' 
+          : '📝 Karya berhasil diajukan! Menunggu persetujuan admin.';
+        
+        setSuccessMessage(message);
+        addLog('✅ Artikel berhasil dibuat!');
         
         // Reset form
         setFormData({
@@ -224,17 +315,20 @@ export default function CreateArticlePage() {
         });
         setImagePreview("");
 
-        // Redirect setelah 2 detik
+        // Redirect setelah 3 detik
         setTimeout(() => {
           router.push(user?.role === 'admin' ? '/admin/dashboard' : '/profile');
-        }, 2000);
+        }, 3000);
 
       } else {
-        alert('❌ Gagal mempublikasikan karya. Silakan coba lagi.');
+        addLog(`❌ API Error: ${data.message}`);
+        throw new Error(`Gagal mempublikasikan karya: ${data.message}`);
       }
-    } catch (error) {
+      
+    } catch (error: any) {
       console.error('❌ Error creating article:', error);
-      alert('Terjadi kesalahan saat mempublikasikan karya. Silakan coba lagi.');
+      addLog(`❌ Error: ${error.message}`);
+      alert(`❌ ${error.message}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -326,6 +420,11 @@ export default function CreateArticlePage() {
                   <span className="text-green-500 mr-2">✅</span>
                   <p className="text-green-800 dark:text-green-200">{successMessage}</p>
                 </div>
+                <p className={`text-sm mt-2 ${
+                  darkMode ? 'text-green-300' : 'text-green-600'
+                }`}>
+                  Akan diarahkan dalam 3 detik...
+                </p>
               </div>
             )}
 
@@ -473,7 +572,7 @@ export default function CreateArticlePage() {
                       type="button"
                       onClick={() => {
                         setImagePreview("");
-                        setFormData(prev => ({ ...prev, cover_image: "" }));
+                        setFormData(prev => ({ ...prev, cover_image: defaultCovers[formData.category_name] || '/cover/default.jpg' }));
                       }}
                       className={`px-4 py-3 rounded-lg border transition-colors ${
                         darkMode 
@@ -627,6 +726,68 @@ export default function CreateArticlePage() {
                 </Link>
               </div>
 
+              {/* API Logs */}
+              {apiLogs.length > 0 && (
+                <div className={`mt-8 p-4 rounded-lg border ${
+                  darkMode ? 'bg-gray-800 border-gray-700' : 'bg-gray-100 border-gray-300'
+                }`}>
+                  <h4 className="font-semibold mb-2">📊 API Logs:</h4>
+                  <div className="max-h-40 overflow-y-auto text-sm font-mono">
+                    {apiLogs.map((log, index) => (
+                      <div key={index} className={`py-1 border-b ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
+                        {log}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Debug Section (Hanya untuk development) */}
+              <div className={`mt-8 p-4 rounded-lg ${
+                darkMode ? 'bg-red-900/20 border border-red-800' : 'bg-red-50 border border-red-200'
+              }`}>
+                <h4 className="font-semibold text-red-800 dark:text-red-200 mb-2">🧪 Debug Tools</h4>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => testApiConnection()}
+                    className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm"
+                  >
+                    Test API Connection
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      console.log('🔍 Current form data:', formData);
+                      console.log('👤 Current user:', user);
+                      console.log('🔑 Token:', localStorage.getItem('token'));
+                      console.log('📊 Errors:', errors);
+                    }}
+                    className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 text-sm"
+                  >
+                    Log Debug Info
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const token = localStorage.getItem('token');
+                      if (token) {
+                        console.log('🔑 Token details:', token);
+                        try {
+                          const payload = JSON.parse(atob(token.split('.')[1]));
+                          console.log('👤 Token payload:', payload);
+                        } catch (e) {
+                          console.log('❌ Cannot decode token');
+                        }
+                      }
+                    }}
+                    className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm"
+                  >
+                    Decode Token
+                  </button>
+                </div>
+              </div>
+
               {/* Info for regular users */}
               {user.role !== 'admin' && (
                 <div className={`p-4 rounded-lg ${
@@ -658,6 +819,8 @@ export default function CreateArticlePage() {
                       <li>✅ Kategori: {formData.category_name ? 'Terpilih' : 'Belum dipilih'}</li>
                       <li>✅ Konten: {formData.content ? `${formData.content.length} karakter` : 'Belum diisi'}</li>
                       <li>🖼️ Cover: {formData.cover_image ? 'Ada' : 'Default'}</li>
+                      <li>👤 Penulis: {formData.author_name || user.username}</li>
+                      <li>📋 Status: {user.role === 'admin' ? 'Published langsung' : 'Pending review'}</li>
                     </ul>
                   </div>
                 </div>

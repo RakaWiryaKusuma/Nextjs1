@@ -4,15 +4,12 @@ import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
 
-// ============== IMPORT REAL CONTEXTS ==============
 import { useAuth } from "./contexts/AuthContext";
 import { useDarkMode } from "./hooks/useDarkMode";
-// ============== END IMPORT ==============
 
-// Fallback articles data (gunakan ini jika ArticleContext belum ada)
 const fallbackArticles = [
   {
-    id: 1,
+    id: "laut-1",
     title: "Laut",
     excerpt: "Bayangkan, aku dan kau menikmati deburan ombak Duduk di pasir yang hangat",
     author: "Drupadi Prameswari Ikhwan",
@@ -26,10 +23,11 @@ const fallbackArticles = [
     comments: 31,
     comment_count: 31,
     view_count: 342,
-    cover_image: "/cover/Laut.jpg"
+    cover_image: "/cover/Laut.jpg",
+    content: `Bayangkan, aku dan kau menikmati deburan ombak...` // Konten lengkap
   },
   {
-    id: 2,
+    id: "dirimu-2",
     title: "Dirimu",
     excerpt: "Ketika sang surya telah tenggelam di dalam nisha Dan purnama pun menghiasi malam yang menyiksa",
     author: "Febiana Nur Hidayah",
@@ -43,10 +41,11 @@ const fallbackArticles = [
     comments: 23,
     comment_count: 23,
     view_count: 256,
-    cover_image: "/cover/dirimu.jpeg"
+    cover_image: "/cover/dirimu.jpeg",
+    content: `Ketika sang surya telah tenggelam di dalam nisha...` // Konten lengkap
   },
   {
-    id: 3,
+    id: "pohon-3",
     title: "Pohon",
     excerpt: "Pohon setelah terluka Tak akan menunggu permintaan maaf",
     author: "Raykenzie Nazaru F",
@@ -60,19 +59,17 @@ const fallbackArticles = [
     comments: 42,
     comment_count: 42,
     view_count: 321,
-    cover_image: "/cover/pohon.jpg"
+    cover_image: "/cover/pohon.jpg",
+    content: `Pohon setelah terluka...` // Konten lengkap
   }
 ];
 
 const App: React.FC = () => {
   const [currentSlide, setCurrentSlide] = useState(0);
   
-  // ============== USE REAL CONTEXTS ==============
-  const { user, logout } = useAuth(); // PAKAI REAL AUTH CONTEXT
-  const { darkMode, toggleDarkMode, mounted } = useDarkMode(); // PAKAI REAL DARK MODE
-  // ============== END REAL CONTEXTS ==============
+  const { user, logout } = useAuth();
+  const { darkMode, toggleDarkMode, mounted } = useDarkMode();
 
-  // Use fallback articles untuk sekarang
   const displayFeaturedArticles = fallbackArticles;
   const displayTrendingArticles = fallbackArticles.slice(0, 3);
 
@@ -94,11 +91,10 @@ const App: React.FC = () => {
     }
   }, [displayFeaturedArticles.length]);
 
-  // Fungsi untuk mendapatkan inisial author dengan safety check
-  const getAuthorInitials = (author: any) => {
-    if (!author) return 'A';
+  const getAuthorInitials = (article: any) => {
+    if (!article) return 'A';
     
-    const authorName = author.author_name || author.author || 'Anonymous';
+    const authorName = article.author_name || article.author || 'Anonymous';
     
     try {
       return authorName
@@ -112,29 +108,25 @@ const App: React.FC = () => {
     }
   };
 
-  // Fungsi untuk mendapatkan nama author dengan safety check
   const getAuthorName = (article: any) => {
     return article.author_name || article.author || 'Anonymous';
   };
 
-  // Fungsi untuk mendapatkan kategori dengan safety check
   const getCategory = (article: any) => {
     return article.category_name || article.category || 'General';
   };
 
-  // Fungsi untuk mendapatkan like count dengan safety check
   const getLikeCount = (article: any) => {
     return article.like_count || article.likes || 0;
   };
 
   const handleCategoryClick = (categorySlug: string) => {
-    // Navigate to explore page with category filter
     if (typeof window !== 'undefined') {
       window.location.href = `/explore?category=${categorySlug}`;
     }
   };
 
-  const handleLike = async (articleId: number, e: React.MouseEvent) => {
+  const handleLike = async (articleId: string, e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     
@@ -143,7 +135,6 @@ const App: React.FC = () => {
       return;
     }
     
-    // TODO: Implement like functionality
     console.log('Liking article:', articleId);
   };
 
@@ -170,13 +161,11 @@ const App: React.FC = () => {
       darkMode ? 'bg-gray-900 text-white' : 'bg-white text-gray-900'
     }`}>
       
-      {/* Navigation Bar - FIXED DENGAN REAL USER */}
       <nav className={`fixed top-0 w-full z-50 backdrop-blur-md border-b ${
         darkMode ? 'bg-gray-900/80 border-gray-700' : 'bg-white/80 border-gray-200'
       }`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-4">
-            {/* Logo */}
             <Link href="/" className="flex items-center space-x-3">
               <div className="flex items-center space-x-2">
                 <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center">
@@ -191,7 +180,6 @@ const App: React.FC = () => {
               </div>
             </Link>
 
-            {/* Navigation Links */}
             <div className="hidden md:flex items-center space-x-8">
               {[
                 ["Home", "/", true],
@@ -220,9 +208,7 @@ const App: React.FC = () => {
               })}
             </div>
 
-            {/* Right Section - FIXED DENGAN REAL USER */}
             <div className="flex items-center space-x-4">
-              {/* Dark Mode Toggle */}
               <button
                 onClick={toggleDarkMode}
                 className={`p-2 rounded-lg transition-all ${
@@ -232,10 +218,8 @@ const App: React.FC = () => {
                 {darkMode ? '☀️' : '🌙'}
               </button>
 
-              {/* Auth Section - FIXED DENGAN REAL USER */}
               {user ? (
                 <div className="flex items-center space-x-3">
-                  {/* Tombol Create untuk semua user yang login */}
                   <Link
                     href="/create"
                     className="bg-green-600 text-white px-4 py-2 rounded-lg font-medium hover:shadow-lg transition-all"
@@ -260,7 +244,6 @@ const App: React.FC = () => {
                       </div>
                     </Link>
                     
-                    {/* Dropdown Menu */}
                     <div className={`absolute right-0 mt-2 w-48 rounded-lg shadow-lg py-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 ${
                       darkMode ? 'bg-gray-800' : 'bg-white'
                     }`}>
@@ -306,11 +289,9 @@ const App: React.FC = () => {
         </div>
       </nav>
 
-      {/* Hero Section */}
       <section className="relative pt-32 pb-20 overflow-hidden">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-            {/* Hero Content */}
             <motion.div
               initial={{ opacity: 0, y: 30 }}
               animate={{ opacity: 1, y: 0 }}
@@ -354,7 +335,6 @@ const App: React.FC = () => {
                 </Link>
               </div>
 
-              {/* Stats */}
               <div className="grid grid-cols-3 gap-8 pt-8">
                 {[
                   { number: fallbackArticles.length + "+", label: "Published Works" },
@@ -375,7 +355,6 @@ const App: React.FC = () => {
               </div>
             </motion.div>
 
-            {/* Hero Visual dengan COVER PHOTO */}
             {displayFeaturedArticles.length > 0 && (
               <motion.div
                 initial={{ opacity: 0, scale: 0.9 }}
@@ -390,10 +369,8 @@ const App: React.FC = () => {
                       backgroundImage: `url(${displayFeaturedArticles[currentSlide]?.cover_image || '/cover/Laut.jpg'})`
                     }}
                   >
-                    {/* Gradient overlay */}
                     <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent"></div>
                     
-                    {/* Content overlay */}
                     <div className="absolute bottom-0 left-0 right-0 p-8">
                       <div className="mb-3">
                         <span className={`px-3 py-1 rounded-full text-sm font-medium ${
@@ -420,7 +397,6 @@ const App: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Slide Indicators */}
                 <div className="flex justify-center space-x-2 mt-6">
                   {displayFeaturedArticles.map((_, index) => (
                     <button
@@ -440,7 +416,6 @@ const App: React.FC = () => {
         </div>
       </section>
 
-      {/* Categories Section */}
       <section className={`py-20 ${darkMode ? 'bg-gray-800' : 'bg-gray-50'}`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
@@ -474,7 +449,7 @@ const App: React.FC = () => {
                 </div>
                 <h3 className="font-semibold mb-2">{category.name}</h3>
                 <p className={`text-sm ${
-                  darkMode ? 'text-gray-400' : 'text-gray-500'
+                  darkMode ? 'text-gray-400' : 'text-gray-600'
                 }`}>
                   {category.count} works
                 </p>
@@ -484,7 +459,6 @@ const App: React.FC = () => {
         </div>
       </section>
 
-      {/* Featured Articles dengan COVER PHOTOS */}
       <section className="py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-end mb-16">
@@ -528,7 +502,6 @@ const App: React.FC = () => {
               >
                 <Link href={`/article/${article.id}`} className="block">
                   <div className="relative overflow-hidden">
-                    {/* COVER PHOTO */}
                     <div 
                       className="aspect-[4/3] bg-cover bg-center relative"
                       style={{ 
@@ -543,7 +516,6 @@ const App: React.FC = () => {
                           {getCategory(article)}
                         </span>
                       </div>
-                      {/* View Count Badge */}
                       <div className="absolute bottom-4 right-4">
                         <span className={`px-2 py-1 rounded text-xs ${
                           darkMode ? 'bg-black/50 text-white' : 'bg-white/90 text-gray-800'
@@ -610,7 +582,6 @@ const App: React.FC = () => {
         </div>
       </section>
 
-      {/* Trending Section */}
       <section className={`py-20 ${darkMode ? 'bg-gray-800' : 'bg-gray-50'}`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
@@ -665,7 +636,6 @@ const App: React.FC = () => {
         </div>
       </section>
 
-      {/* CTA Section */}
       <section className="py-20">
         <div className="max-w-4xl mx-auto text-center px-4 sm:px-6 lg:px-8">
           <motion.div
@@ -715,7 +685,6 @@ const App: React.FC = () => {
         </div>
       </section>
 
-      {/* Footer */}
       <footer className={`py-12 border-t ${
         darkMode ? 'bg-gray-900 border-gray-700' : 'bg-white border-gray-200'
       }`}>

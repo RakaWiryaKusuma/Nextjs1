@@ -1,4 +1,4 @@
-// contexts/ArticleContext.tsx - FINAL FIX - NO HARDCODED CONTENT
+// contexts/ArticleContext.tsx - COMPLETE FIXED VERSION
 'use client';
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 
@@ -8,6 +8,7 @@ export interface Article {
   content: string;
   excerpt: string;
   author_name: string;
+  author_id?: string;
   author_username?: string;
   author_avatar?: string;
   author_bio?: string;
@@ -22,7 +23,7 @@ export interface Article {
   cover_image?: string;
   read_time?: number;
   featured?: boolean;
-  status?: string;
+  status?: 'draft' | 'pending' | 'published' | 'rejected';
   tags?: string[];
   seo_title?: string;
   seo_description?: string;
@@ -107,7 +108,8 @@ const MINIMAL_FALLBACK: Article[] = [
     view_count: 0,
     cover_image: "/cover/default.jpg",
     read_time: 1,
-    featured: false
+    featured: false,
+    status: 'published'
   }
 ];
 
@@ -117,7 +119,9 @@ const FALLBACK_CATEGORIES: Category[] = [
   { id: 3, name: "Puisi", slug: "puisi", article_count: 0 },
   { id: 4, name: "Opini", slug: "opini", article_count: 0 },
   { id: 5, name: "Desain Grafis", slug: "desain", article_count: 0 },
-  { id: 6, name: "Coding Project", slug: "coding", article_count: 0 }
+  { id: 6, name: "Coding Project", slug: "coding", article_count: 0 },
+  { id: 7, name: "Cerita Bergambar", slug: "cerita-bergambar", article_count: 0 },
+  { id: 8, name: "Pantun", slug: "pantun", article_count: 0 }
 ];
 
 export function ArticleProvider({ children }: { children: ReactNode }) {
@@ -174,12 +178,15 @@ export function ArticleProvider({ children }: { children: ReactNode }) {
 
       if (data.success && Array.isArray(data.data)) {
         console.log(`✅ Loaded ${data.data.length} articles from database`);
-        setArticles(data.data);
-        setFilteredArticles(data.data);
+        const filtered = data.data.filter((article: Article) => 
+          article.status === 'published' || article.status === undefined
+        );
+        setArticles(filtered);
+        setFilteredArticles(filtered);
         setPagination(data.pagination || {
           current: 1,
           total: 1,
-          totalItems: data.data.length
+          totalItems: filtered.length
         });
         setFilters(finalFilters);
       } else {
@@ -395,33 +402,73 @@ export function ArticleProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // Admin Actions
+  // CREATE ARTICLE - FIXED VERSION
   const createArticle = async (articleData: any): Promise<boolean> => {
     try {
       const token = localStorage.getItem('token');
-      console.log('📝 Creating article:', articleData.title);
+      if (!token) {
+        alert('Silakan login terlebih dahulu');
+        return false;
+      }
+
+      console.log('📝 Creating article with data:', JSON.stringify(articleData, null, 2));
       
+      // Siapkan data dengan format yang benar
+      const formattedData = {
+        title: articleData.title,
+        content: articleData.content,
+        excerpt: articleData.excerpt,
+        category_name: articleData.category_name,
+        author_name: articleData.author_name,
+        cover_image: articleData.cover_image,
+        tags: articleData.tags,
+        status: articleData.status || 'pending',
+        featured: false,
+        read_time: Math.ceil(articleData.content.length / 1500)
+      };
+
+      console.log('📤 Sending to API:', formattedData);
+
       const response = await fetch(`${API_URL}/articles`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify(articleData),
+        body: JSON.stringify(formattedData)
       });
 
+      console.log('📦 Response status:', response.status);
+
       const data = await response.json();
-      console.log('📦 Create response:', data);
+      console.log('📦 API Response:', data);
 
       if (data.success) {
-        console.log('✅ Article created successfully');
-        await fetchArticles(); // Refresh articles list
+        console.log('✅ Article created successfully:', data.data);
+        
+        // Tambahkan artikel baru ke state
+        const newArticle = {
+          ...formattedData,
+          id: data.data.id,
+          like_count: 0,
+          comment_count: 0,
+          view_count: 0,
+          created_at: new Date().toISOString(),
+          read_time: Math.ceil(articleData.content.length / 1500)
+        };
+        
+        setArticles(prev => [newArticle, ...prev]);
+        setFilteredArticles(prev => [newArticle, ...prev]);
+        
         return true;
+      } else {
+        console.error('❌ API Error:', data.message);
+        alert(`Gagal membuat artikel: ${data.message}`);
+        return false;
       }
-      console.error('❌ Failed to create article:', data.message);
-      return false;
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Error creating article:', error);
+      alert(`Terjadi kesalahan: ${error.message}`);
       return false;
     }
   };
