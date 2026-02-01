@@ -1,6 +1,7 @@
 {
-  "name": "seija-magazine-frontend",
+  "name": "seija-magazine",
   "version": "1.0.0",
+  "description": "SEIJA Magazine Platform",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -10,18 +11,19 @@
     "api": "node server.js",
     "dev:all": "concurrently \"npm run dev\" \"npm run api\""
   },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
+  },
   "dependencies": {
-    "@neondatabase/serverless": "^1.0.2",
-    "@prisma/client": "^7.3.0",
     "@supabase/supabase-js": "^2.91.1",
-    "@vercel/postgres": "^0.10.0",
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.6",
+    "dotenv": "^16.3.1",
     "express": "^4.22.1",
     "framer-motion": "^10.16.0",
     "multer": "^2.0.2",
     "next": "14.0.4",
-    "prisma": "^7.3.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "zod": "^4.3.5"

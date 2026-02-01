@@ -1,4 +1,5 @@
-// server.js - COMPLETE FIXED VERSION WITH ADMIN ENDPOINTS
+// server.js - COMPLETE FIXED VERSION FOR RAILWAY
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const { createClient } = require('@supabase/supabase-js');
@@ -10,12 +11,14 @@ const fs = require('fs');
 const app = express();
 const PORT = process.env.PORT || 3002;
 
-console.log('🚀 SEIJA Magazine API Server - PORT', PORT);
+console.log('🚀 SEIJA Magazine API Server');
+console.log('📦 Mode:', process.env.NODE_ENV || 'development');
+console.log('🔧 PORT:', PORT);
 
 // ==================== MULTER CONFIGURATION ====================
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    const uploadDir = 'public/uploads';
+    const uploadDir = path.join(__dirname, 'public/uploads');
     if (!fs.existsSync(uploadDir)) {
       fs.mkdirSync(uploadDir, { recursive: true });
     }
@@ -47,7 +50,17 @@ const upload = multer({
 
 // ==================== MIDDLEWARE ====================
 app.use(cors({
-  origin: ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:3002'],
+  origin: [
+    'http://localhost:3000',
+    'http://localhost:3001',
+    'http://localhost:3002',
+    'https://www.seijamagazine.site',
+    'https://seijamagazine.site',
+    'https://seijamagazine.vercel.app',
+    'https://seija-magazine.vercel.app',
+    'https://*.vercel.app',
+    'https://*.railway.app'
+  ],
   credentials: true
 }));
 app.use(express.json({ limit: '50mb' }));
@@ -59,18 +72,19 @@ app.use('/cover', express.static(path.join(__dirname, 'public/cover')));
 // Create directories
 const dirs = ['public/uploads', 'public/cover'];
 dirs.forEach(dir => {
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
+  const dirPath = path.join(__dirname, dir);
+  if (!fs.existsSync(dirPath)) {
+    fs.mkdirSync(dirPath, { recursive: true });
     console.log(`📁 Created directory: ${dir}`);
   }
 });
 
 // ==================== SUPABASE CONFIG ====================
-const SUPABASE_URL = 'https://mfymrinerlgzygnoimve.supabase.co';
-const SUPABASE_KEY = 'sb_publishable_nECRhfJNuXfovy-0-V5Crg_NUCRSZic';
+const SUPABASE_URL = process.env.SUPABASE_URL || 'https://mfymrinerlgzygnoimve.supabase.co';
+const SUPABASE_KEY = process.env.SUPABASE_KEY || 'sb_publishable_nECRhfJNuXfovy-0-V5Crg_NUCRSZic';
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
-console.log('📊 Supabase URL:', SUPABASE_URL);
+console.log('📊 Supabase connected:', SUPABASE_URL);
 
 // ==================== HELPER FUNCTIONS ====================
 const validateToken = (token) => {
@@ -181,6 +195,7 @@ app.get('/api/health', (req, res) => {
     message: 'SEIJA Magazine API is running on PORT ' + PORT,
     timestamp: new Date().toISOString(),
     version: '1.0.0',
+    environment: process.env.NODE_ENV || 'development',
     endpoints: {
       upload: 'POST /api/upload/image',
       articles: 'GET /api/articles',
@@ -216,13 +231,6 @@ app.post('/api/auth/login', async (req, res) => {
       return res.status(401).json({
         success: false,
         message: 'Invalid credentials'
-      });
-    }
-    
-    if (password.length < 6) {
-      return res.status(401).json({
-        success: false,
-        message: 'Password must be at least 6 characters'
       });
     }
     
@@ -273,13 +281,6 @@ app.post('/api/auth/register', async (req, res) => {
       return res.status(400).json({
         success: false,
         message: 'Password must be at least 6 characters'
-      });
-    }
-    
-    if (!email.includes('@')) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid email address'
       });
     }
     
@@ -424,7 +425,6 @@ app.get('/api/articles', async (req, res) => {
       .from('articles')
       .select('*', { count: 'exact' });
     
-    // ONLY SHOW PUBLISHED ARTICLES FOR PUBLIC
     query = query.eq('status', 'published');
     
     if (search && search.trim() !== '') {
@@ -500,7 +500,6 @@ app.get('/api/articles/:id', async (req, res) => {
       });
     }
     
-    // ONLY SHOW PUBLISHED ARTICLES TO PUBLIC
     if (article.status !== 'published') {
       return res.status(404).json({
         success: false,
@@ -815,7 +814,6 @@ app.post('/api/articles/:id/like', authenticate, async (req, res) => {
 });
 
 // ==================== ADMIN ENDPOINTS ====================
-// GET pending articles only (admin dashboard)
 app.get('/api/admin/articles/pending', authenticate, adminOnly, async (req, res) => {
   try {
     console.log('👑 [ADMIN] Fetching pending articles');
@@ -848,7 +846,6 @@ app.get('/api/admin/articles/pending', authenticate, adminOnly, async (req, res)
   }
 });
 
-// GET all articles with all statuses (admin only)
 app.get('/api/admin/articles', authenticate, adminOnly, async (req, res) => {
   try {
     const { 
@@ -866,7 +863,6 @@ app.get('/api/admin/articles', authenticate, adminOnly, async (req, res) => {
       .from('articles')
       .select('*', { count: 'exact' });
     
-    // Admin can see ALL articles regardless of status
     if (status && status !== 'all') {
       query = query.eq('status', status);
     }
@@ -924,7 +920,6 @@ app.get('/api/admin/articles', authenticate, adminOnly, async (req, res) => {
   }
 });
 
-// UPDATE article status (approve/reject)
 app.put('/api/admin/articles/:id/status', authenticate, adminOnly, async (req, res) => {
   try {
     const { id } = req.params;
@@ -976,7 +971,6 @@ app.put('/api/admin/articles/:id/status', authenticate, adminOnly, async (req, r
   }
 });
 
-// BATCH update status (approve/reject multiple)
 app.post('/api/admin/articles/batch-status', authenticate, adminOnly, async (req, res) => {
   try {
     const { articleIds, status } = req.body;
@@ -1139,13 +1133,11 @@ app.get('/api/users/:id', authenticate, async (req, res) => {
       });
     }
     
-    // User can only see their own articles or admin can see all
     let articlesQuery = supabase
       .from('articles')
       .select('*')
       .eq('author_id', id);
     
-    // Non-admin users can only see their published articles
     if (req.user.role !== 'admin') {
       articlesQuery = articlesQuery.eq('status', 'published');
     }
@@ -1325,43 +1317,16 @@ app.use((err, req, res, next) => {
 });
 
 // ==================== START SERVER ====================
-const server = app.listen(PORT, () => {
-  console.log(`\n✅ SEIJA Magazine API Server running on http://localhost:${PORT}`);
-  console.log('\n📡 AVAILABLE ENDPOINTS:');
-  console.log('   POST /api/upload/image     - Upload gambar');
-  console.log('   GET  /api/health           - Health check');
-  console.log('   POST /api/auth/login       - Login user');
-  console.log('   POST /api/auth/register    - Register user');
-  console.log('   GET  /api/categories       - Get categories');
-  console.log('   GET  /api/articles         - Get all published articles');
-  console.log('   GET  /api/articles/:id     - Get single published article');
-  console.log('   POST /api/articles         - Create article (auto-pending for non-admin)');
-  console.log('   PUT  /api/articles/:id     - Update article');
-  console.log('   DELETE /api/articles/:id   - Delete article');
-  console.log('   POST /api/articles/:id/like - Like article');
-  console.log('   GET  /api/articles/:id/comments - Get comments');
-  console.log('   POST /api/articles/:id/comments - Add comment');
-  console.log('   👑 ADMIN ENDPOINTS:');
-  console.log('   GET  /api/admin/articles   - Get all articles (all statuses)');
-  console.log('   GET  /api/admin/articles/pending - Get pending articles');
-  console.log('   PUT  /api/admin/articles/:id/status - Approve/reject article');
-  console.log('   POST /api/admin/articles/batch-status - Batch approve/reject');
-  console.log('   GET  /api/users/:id        - Get user profile');
-  console.log('   GET  /api/statistics       - Get statistics');
-  console.log('   GET  /api/test/articles    - Test endpoint');
-  console.log('   POST /api/init-categories  - Initialize categories');
-  console.log('\n🎯 CATEGORIES: Novel, Cerpen, Puisi, Opini, Desain Grafis, Coding Project, Cerita Bergambar, Pantun');
-  console.log('📁 Upload folder: public/uploads/');
-  console.log('📁 Cover folder: public/cover/');
-  console.log('\n🔥 TEST UPLOAD: curl -X POST http://localhost:3002/api/upload/image -F "image=@test.jpg"');
-  console.log('\n👑 TEST ADMIN: curl -H "Authorization: Bearer {token}" http://localhost:3002/api/admin/articles/pending');
+const server = app.listen(PORT, '0.0.0.0', () => {
+  console.log(`\n✅ SEIJA Magazine API Server running`);
+  console.log(`🌐 URL: http://0.0.0.0:${PORT}`);
+  console.log(`📡 Health: http://0.0.0.0:${PORT}/api/health`);
+  console.log('🚀 Ready for Railway deployment!');
 });
 
 server.on('error', (error) => {
   if (error.code === 'EADDRINUSE') {
     console.error(`❌ Port ${PORT} is already in use`);
-    console.log('💡 Try: lsof -ti:3002 | xargs kill -9');
-    console.log('💡 Or change PORT to 3003 in server.js');
   } else {
     console.error('❌ Server error:', error);
   }

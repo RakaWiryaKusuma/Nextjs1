@@ -48,7 +48,6 @@ interface ArticleContextType {
   loading: boolean;
   searchLoading: boolean;
   
-  // Admin specific
   adminArticles: Article[];
   pendingArticles: Article[];
   adminLoading: boolean;
@@ -72,7 +71,6 @@ interface ArticleContextType {
   updateArticle: (articleId: string, updates: any) => Promise<boolean>;
   deleteArticle: (articleId: string) => Promise<boolean>;
   
-  // Admin functions - FIXED
   fetchAdminArticles: (status?: string) => Promise<void>;
   fetchPendingArticles: () => Promise<void>;
   updateArticleStatus: (articleId: string, status: string) => Promise<boolean>;
@@ -105,7 +103,6 @@ export function ArticleProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [searchLoading, setSearchLoading] = useState(false);
   
-  // Admin states
   const [adminArticles, setAdminArticles] = useState<Article[]>([]);
   const [pendingArticles, setPendingArticles] = useState<Article[]>([]);
   const [adminLoading, setAdminLoading] = useState(false);
@@ -118,9 +115,14 @@ export function ArticleProvider({ children }: { children: ReactNode }) {
     limit: 12
   });
 
-  const API_URL = 'http://localhost:3002/api';
+  const API_URL = process.env.NEXT_PUBLIC_API_URL 
+    ? `${process.env.NEXT_PUBLIC_API_URL}/api`
+    : 'http://localhost:3002/api';
 
-  // ==================== UPLOAD FUNCTION ====================
+  console.log('🌐 ArticleContext initialized');
+  console.log('🔗 API_URL:', API_URL);
+  console.log('🏭 NODE_ENV:', process.env.NODE_ENV);
+
   const uploadImage = async (file: File): Promise<string | null> => {
     try {
       console.log('📤 [UPLOAD IMAGE] Uploading:', file.name);
@@ -153,7 +155,6 @@ export function ArticleProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // ==================== CREATE ARTICLE ====================
   const createArticle = async (articleData: any): Promise<boolean> => {
     try {
       console.log('📝 [CREATE ARTICLE] Starting...');
@@ -167,12 +168,10 @@ export function ArticleProvider({ children }: { children: ReactNode }) {
       const user = JSON.parse(savedUser);
       console.log('📝 [CREATE ARTICLE] User:', user.username);
 
-      // UPLOAD GAMBAR JIKA ADA
       let coverImageUrl = '/cover/default.jpg';
       
       if (articleData.imageFile && articleData.imageFile instanceof File) {
         console.log('🖼️ [CREATE ARTICLE] Found image file, uploading...');
-        
         const uploadedUrl = await uploadImage(articleData.imageFile);
         if (uploadedUrl) {
           coverImageUrl = uploadedUrl;
@@ -180,13 +179,11 @@ export function ArticleProvider({ children }: { children: ReactNode }) {
         } else {
           console.warn('⚠️ [CREATE ARTICLE] Upload failed, using default image');
         }
-      } 
-      else if (articleData.cover_image && articleData.cover_image !== '' && articleData.cover_image !== '/cover/default.jpg') {
+      } else if (articleData.cover_image && articleData.cover_image !== '' && articleData.cover_image !== '/cover/default.jpg') {
         coverImageUrl = articleData.cover_image;
         console.log('🔗 [CREATE ARTICLE] Using provided image URL:', coverImageUrl);
       }
 
-      // BUAT READ TIME
       const calculateReadTime = (text: string): number => {
         const words = text.trim().split(/\s+/).length;
         return Math.max(1, Math.ceil(words / 200));
@@ -222,7 +219,7 @@ export function ArticleProvider({ children }: { children: ReactNode }) {
       if (data.success) {
         console.log('✅ [CREATE ARTICLE] Article created successfully');
         await fetchArticles();
-        await fetchPendingArticles(); // Refresh pending list
+        await fetchPendingArticles();
         return true;
       } else {
         console.error('❌ [CREATE ARTICLE] API Error:', data.message);
@@ -236,7 +233,6 @@ export function ArticleProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // ==================== FETCH ARTICLES (PUBLIC) ====================
   const fetchArticles = async (newFilters?: Partial<typeof filters>) => {
     try {
       const finalFilters = { ...filters, ...newFilters, page: newFilters?.page || 1 };
@@ -305,7 +301,6 @@ export function ArticleProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // ==================== ADMIN FUNCTIONS ====================
   const fetchAdminArticles = async (status?: string) => {
     try {
       const savedUser = localStorage.getItem('seija_user');
@@ -360,7 +355,6 @@ export function ArticleProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // ==================== FETCH PENDING ARTICLES - FIXED VERSION ====================
   const fetchPendingArticles = async () => {
     try {
       const savedUser = localStorage.getItem('seija_user');
@@ -372,7 +366,6 @@ export function ArticleProvider({ children }: { children: ReactNode }) {
       const user = JSON.parse(savedUser);
       console.log('👑 [FETCH PENDING] User role:', user.role);
       
-      // Cek role dulu sebelum fetch
       if (user.role !== 'admin') {
         console.warn('⚠️ [FETCH PENDING] Non-admin trying to access pending articles');
         return;
@@ -445,12 +438,9 @@ export function ArticleProvider({ children }: { children: ReactNode }) {
 
       if (data.success) {
         console.log(`✅ [UPDATE ARTICLE STATUS] Success: ${data.message}`);
-        
-        // Update local state
         await fetchArticles();
         await fetchAdminArticles();
         await fetchPendingArticles();
-        
         return true;
       } else {
         console.error('❌ [UPDATE ARTICLE STATUS] Failed:', data.message);
@@ -493,12 +483,9 @@ export function ArticleProvider({ children }: { children: ReactNode }) {
 
       if (data.success) {
         console.log(`✅ [BATCH UPDATE STATUS] Success: ${data.message}`);
-        
-        // Update local state
         await fetchArticles();
         await fetchAdminArticles();
         await fetchPendingArticles();
-        
         return true;
       } else {
         console.error('❌ [BATCH UPDATE STATUS] Failed:', data.message);
@@ -613,7 +600,6 @@ export function ArticleProvider({ children }: { children: ReactNode }) {
       if (data.success) {
         console.log(`✅ [LIKE ARTICLE] Success, liked: ${data.liked}`);
         
-        // Fungsi untuk update like count
         const updateArticleLikes = (article: Article) => {
           return {
             ...article,
@@ -623,11 +609,9 @@ export function ArticleProvider({ children }: { children: ReactNode }) {
           };
         };
 
-        // Update articles dan filteredArticles
         setArticles(prev => prev.map(updateArticleLikes));
         setFilteredArticles(prev => prev.map(updateArticleLikes));
 
-        // Update currentArticle - PERBAIKAN DI SINI
         if (currentArticle?.id === articleId) {
           setCurrentArticle(prev => {
             if (!prev) return null;
@@ -804,14 +788,12 @@ export function ArticleProvider({ children }: { children: ReactNode }) {
     });
   };
 
-  // ==================== INITIAL LOAD ====================
   useEffect(() => {
     const loadInitialData = async () => {
       console.log('🚀 [INIT] Loading initial data...');
       await fetchArticles();
       await fetchCategories();
       
-      // Check if user is admin and load admin data
       const savedUser = localStorage.getItem('seija_user');
       if (savedUser) {
         const user = JSON.parse(savedUser);
@@ -850,7 +832,6 @@ export function ArticleProvider({ children }: { children: ReactNode }) {
     loading,
     searchLoading,
     
-    // Admin specific
     adminArticles,
     pendingArticles,
     adminLoading,
@@ -866,7 +847,6 @@ export function ArticleProvider({ children }: { children: ReactNode }) {
     updateArticle,
     deleteArticle,
     
-    // Admin functions
     fetchAdminArticles,
     fetchPendingArticles,
     updateArticleStatus,
