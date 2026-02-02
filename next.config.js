@@ -1,6 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: 'standalone',
+  output: 'standalone', // INI PENTING!
   reactStrictMode: true,
   swcMinify: true,
   images: {
@@ -27,20 +27,14 @@ const nextConfig = {
       },
       {
         protocol: 'https',
-        hostname: 'railway.app',
-        pathname: '/**',
-      },
-      {
-        protocol: 'https',
         hostname: '*.up.railway.app',
         pathname: '/**',
       }
     ],
   },
-  env: {
-    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002',
-    NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
-    NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  // Add this for Railway
+  experimental: {
+    outputFileTracingRoot: process.cwd(),
   }
 }
 

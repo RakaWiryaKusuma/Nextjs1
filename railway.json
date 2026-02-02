@@ -9,7 +9,6 @@
     "startCommand": "npm start",
     "healthcheckPath": "/api/health",
     "healthcheckTimeout": 60,
-    "restartPolicyType": "ALWAYS",
-    "restartPolicyMaxRetries": 3
+    "restartPolicyType": "ALWAYS"
   }
 }

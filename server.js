@@ -1,4 +1,4 @@
-// server.js - VERSION FOR RAILWAY DEPLOYMENT
+// server.js - COMPLETE VERSION WITH NEXT.JS + EXPRESS
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
@@ -9,17 +9,16 @@ const path = require('path');
 const fs = require('fs');
 
 const app = express();
-const PORT = process.env.PORT || 3002;
+const PORT = process.env.PORT || 3000;
 
-console.log('🚀 SEIJA Magazine API Server - Railway Ready');
+console.log('🚀 SEIJA Magazine Full Stack Server - Railway Ready');
 console.log('📦 Mode:', process.env.NODE_ENV || 'development');
 console.log('🔧 PORT:', PORT);
 
-// ==================== CORS CONFIGURATION FOR RAILWAY ====================
+// ==================== CORS CONFIGURATION ====================
 const allowedOrigins = [
   'http://localhost:3000',
   'http://localhost:3001',
-  'http://localhost:3002',
   'https://seijamagazine.site',
   'https://www.seijamagazine.site',
   'https://seijamagazine.vercel.app',
@@ -30,10 +29,8 @@ const allowedOrigins = [
 
 const corsOptions = {
   origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
     
-    // Check against allowed origins
     const isAllowed = allowedOrigins.some(allowedOrigin => {
       if (allowedOrigin instanceof RegExp) {
         return allowedOrigin.test(origin);
@@ -73,6 +70,29 @@ const SUPABASE_KEY = process.env.SUPABASE_KEY || process.env.NEXT_PUBLIC_SUPABAS
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 console.log('📊 Supabase connected:', SUPABASE_URL);
+
+// ==================== SERVE NEXT.JS STATIC FILES ====================
+// Serve static files from .next/static
+app.use('/_next', express.static(path.join(__dirname, '.next')));
+
+// Serve public files
+app.use(express.static(path.join(__dirname, 'public')));
+
+// ==================== ROOT ENDPOINT ====================
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// ==================== HEALTH CHECK ====================
+app.get('/api/health', (req, res) => {
+  res.json({
+    success: true,
+    message: 'SEIJA Magazine Full Stack is running on Railway',
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV,
+    port: PORT
+  });
+});
 
 // ==================== HELPER FUNCTIONS ====================
 const validateToken = (token) => {
@@ -159,14 +179,13 @@ const calculateReadTime = (content) => {
   return Math.max(1, Math.ceil(words / wordsPerMinute));
 };
 
-// ==================== UPLOAD ENDPOINT - MODIFIED FOR RAILWAY ====================
+// ==================== UPLOAD ENDPOINT ====================
 const storage = multer.memoryStorage();
 const upload = multer({
   storage: storage,
   limits: { fileSize: 10 * 1024 * 1024 }
 });
 
-// Upload to Supabase Storage (Recommended for Railway)
 app.post('/api/upload/image', upload.single('image'), async (req, res) => {
   try {
     if (!req.file) {
@@ -185,7 +204,7 @@ app.post('/api/upload/image', upload.single('image'), async (req, res) => {
     
     // Upload to Supabase Storage
     const { data, error } = await supabase.storage
-      .from('seija-files') // Make sure this bucket exists in Supabase
+      .from('seija-files')
       .upload(filePath, req.file.buffer, {
         contentType: req.file.mimetype,
         cacheControl: '3600',
@@ -195,7 +214,7 @@ app.post('/api/upload/image', upload.single('image'), async (req, res) => {
     if (error) {
       console.error('Supabase upload error:', error);
       
-      // Fallback: Save locally (for Railway Volume if configured)
+      // Fallback: Save locally
       try {
         const uploadDir = path.join(__dirname, 'public', 'uploads');
         if (!fs.existsSync(uploadDir)) {
@@ -240,7 +259,7 @@ app.post('/api/upload/image', upload.single('image'), async (req, res) => {
   }
 });
 
-// For backward compatibility with existing uploads
+// For backward compatibility
 app.post('/api/upload/image-local', upload.single('image'), async (req, res) => {
   try {
     if (!req.file) {
@@ -255,7 +274,6 @@ app.post('/api/upload/image-local', upload.single('image'), async (req, res) => 
     const ext = path.extname(req.file.originalname).toLowerCase() || '.jpg';
     const filename = `seija_${timestamp}_${random}${ext}`;
     
-    // Use Railway Volume path or local path
     const uploadDir = process.env.RAILWAY_VOLUME_PATH 
       ? path.join(process.env.RAILWAY_VOLUME_PATH, 'uploads')
       : path.join(__dirname, 'public', 'uploads');
@@ -267,7 +285,6 @@ app.post('/api/upload/image-local', upload.single('image'), async (req, res) => 
     const filePath = path.join(uploadDir, filename);
     fs.writeFileSync(filePath, req.file.buffer);
     
-    // Construct URL
     const baseUrl = process.env.RAILWAY_PUBLIC_DOMAIN 
       ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`
       : '';
@@ -290,34 +307,16 @@ app.post('/api/upload/image-local', upload.single('image'), async (req, res) => 
   }
 });
 
-// Serve static files from Railway Volume if exists
-const staticDir = process.env.RAILWAY_VOLUME_PATH 
-  ? path.join(process.env.RAILWAY_VOLUME_PATH, 'public')
-  : path.join(__dirname, 'public');
+// Serve uploaded files
+app.use('/uploads', express.static(path.join(__dirname, 'public/uploads')));
+app.use('/cover', express.static(path.join(__dirname, 'public/cover')));
 
-if (fs.existsSync(staticDir)) {
-  app.use('/uploads', express.static(path.join(staticDir, 'uploads')));
-  app.use('/cover', express.static(path.join(staticDir, 'cover')));
-  console.log('📁 Serving static files from:', staticDir);
-}
-
-// Create directories if they don't exist
+// Create directories
 ['public/uploads', 'public/cover'].forEach(dir => {
   const dirPath = path.join(__dirname, dir);
   if (!fs.existsSync(dirPath)) {
     fs.mkdirSync(dirPath, { recursive: true });
   }
-});
-
-// ==================== HEALTH CHECK ====================
-app.get('/api/health', (req, res) => {
-  res.json({
-    success: true,
-    message: 'SEIJA Magazine API is running on Railway',
-    timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV,
-    port: PORT
-  });
 });
 
 // ==================== TEST ENDPOINTS ====================
@@ -672,557 +671,20 @@ app.post('/api/articles', authenticate, async (req, res) => {
   }
 });
 
-app.put('/api/articles/:id', authenticate, async (req, res) => {
-  try {
-    const { id } = req.params;
-    const updates = req.body;
-    
-    // Check if article exists and belongs to user (or user is admin)
-    const { data: article, error: fetchError } = await supabase
-      .from('articles')
-      .select('*')
-      .eq('id', id)
-      .single();
-    
-    if (fetchError || !article) {
-      return res.status(404).json({
-        success: false,
-        message: 'Artikel tidak ditemukan'
-      });
-    }
-    
-    // Check permission
-    if (article.author_id !== req.user.id && req.user.role !== 'admin') {
-      return res.status(403).json({
-        success: false,
-        message: 'Anda tidak memiliki izin untuk mengedit artikel ini'
-      });
-    }
-    
-    // Update article
-    updates.updated_at = new Date().toISOString();
-    
-    const { data, error } = await supabase
-      .from('articles')
-      .update(updates)
-      .eq('id', id)
-      .select()
-      .single();
-    
-    if (error) throw error;
-    
-    res.json({
-      success: true,
-      message: 'Artikel berhasil diperbarui',
-      data: data
-    });
-    
-  } catch (error) {
-    console.error('Error updating article:', error);
-    res.status(500).json({
+// ==================== CATCH-ALL FOR NEXT.JS ROUTES ====================
+// This must be AFTER all your API routes
+app.get('*', (req, res) => {
+  // If it's an API route that wasn't caught, return 404
+  if (req.path.startsWith('/api/')) {
+    return res.status(404).json({
       success: false,
-      message: 'Gagal memperbarui artikel'
+      message: 'API endpoint tidak ditemukan',
+      path: req.path
     });
   }
-});
-
-app.delete('/api/articles/:id', authenticate, async (req, res) => {
-  try {
-    const { id } = req.params;
-    
-    // Check if article exists
-    const { data: article, error: fetchError } = await supabase
-      .from('articles')
-      .select('*')
-      .eq('id', id)
-      .single();
-    
-    if (fetchError || !article) {
-      return res.status(404).json({
-        success: false,
-        message: 'Artikel tidak ditemukan'
-      });
-    }
-    
-    // Check permission
-    if (article.author_id !== req.user.id && req.user.role !== 'admin') {
-      return res.status(403).json({
-        success: false,
-        message: 'Anda tidak memiliki izin untuk menghapus artikel ini'
-      });
-    }
-    
-    // Delete article
-    const { error } = await supabase
-      .from('articles')
-      .delete()
-      .eq('id', id);
-    
-    if (error) throw error;
-    
-    res.json({
-      success: true,
-      message: 'Artikel berhasil dihapus'
-    });
-    
-  } catch (error) {
-    console.error('Error deleting article:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Gagal menghapus artikel'
-    });
-  }
-});
-
-// ==================== LIKE SYSTEM ====================
-app.post('/api/articles/:id/like', authenticate, async (req, res) => {
-  try {
-    const { id } = req.params;
-    
-    // Check if article exists
-    const { data: article, error: fetchError } = await supabase
-      .from('articles')
-      .select('*')
-      .eq('id', id)
-      .single();
-    
-    if (fetchError || !article) {
-      return res.status(404).json({
-        success: false,
-        message: 'Artikel tidak ditemukan'
-      });
-    }
-    
-    // Check if user already liked
-    const { data: existingLike } = await supabase
-      .from('likes')
-      .select('id')
-      .eq('article_id', id)
-      .eq('user_id', req.user.id)
-      .single();
-    
-    let liked = false;
-    
-    if (existingLike) {
-      // Unlike: delete like record
-      await supabase
-        .from('likes')
-        .delete()
-        .eq('id', existingLike.id);
-      
-      // Decrement like count
-      await supabase
-        .from('articles')
-        .update({ like_count: Math.max(0, (article.like_count || 0) - 1) })
-        .eq('id', id);
-      
-      liked = false;
-    } else {
-      // Like: create like record
-      await supabase
-        .from('likes')
-        .insert({
-          article_id: id,
-          user_id: req.user.id,
-          created_at: new Date().toISOString()
-        });
-      
-      // Increment like count
-      await supabase
-        .from('articles')
-        .update({ like_count: (article.like_count || 0) + 1 })
-        .eq('id', id);
-      
-      liked = true;
-    }
-    
-    res.json({
-      success: true,
-      liked: liked,
-      message: liked ? 'Artikel disukai' : 'Like dihapus'
-    });
-    
-  } catch (error) {
-    console.error('Error liking article:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Gagal memproses like'
-    });
-  }
-});
-
-// ==================== COMMENTS ====================
-app.get('/api/articles/:id/comments', async (req, res) => {
-  try {
-    const { id } = req.params;
-    
-    const { data: comments, error } = await supabase
-      .from('comments')
-      .select('*')
-      .eq('article_id', id)
-      .order('created_at', { ascending: true });
-    
-    if (error) throw error;
-    
-    res.json({
-      success: true,
-      data: comments || []
-    });
-    
-  } catch (error) {
-    console.error('Error fetching comments:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Gagal mengambil komentar'
-    });
-  }
-});
-
-app.post('/api/articles/:id/comments', authenticate, async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { content, parent_id } = req.body;
-    
-    if (!content || content.trim() === '') {
-      return res.status(400).json({
-        success: false,
-        message: 'Komentar tidak boleh kosong'
-      });
-    }
-    
-    // Check if article exists
-    const { data: article, error: fetchError } = await supabase
-      .from('articles')
-      .select('*')
-      .eq('id', id)
-      .single();
-    
-    if (fetchError || !article) {
-      return res.status(404).json({
-        success: false,
-        message: 'Artikel tidak ditemukan'
-      });
-    }
-    
-    // Create comment
-    const commentData = {
-      article_id: id,
-      user_id: req.user.id,
-      username: req.user.username,
-      content: content.trim(),
-      parent_id: parent_id || null,
-      created_at: new Date().toISOString()
-    };
-    
-    const { data: comment, error } = await supabase
-      .from('comments')
-      .insert(commentData)
-      .select()
-      .single();
-    
-    if (error) throw error;
-    
-    // Increment comment count
-    await supabase
-      .from('articles')
-      .update({ comment_count: (article.comment_count || 0) + 1 })
-      .eq('id', id);
-    
-    res.json({
-      success: true,
-      message: 'Komentar berhasil ditambahkan',
-      data: comment
-    });
-    
-  } catch (error) {
-    console.error('Error adding comment:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Gagal menambahkan komentar'
-    });
-  }
-});
-
-// ==================== STATISTICS ====================
-app.get('/api/statistics', async (req, res) => {
-  try {
-    // Get total articles
-    const { count: totalArticles } = await supabase
-      .from('articles')
-      .select('*', { count: 'exact', head: true })
-      .eq('status', 'published');
-    
-    // Get total users
-    const { count: totalUsers } = await supabase
-      .from('users')
-      .select('*', { count: 'exact', head: true });
-    
-    // Get recent articles
-    const { data: recentArticles } = await supabase
-      .from('articles')
-      .select('*')
-      .eq('status', 'published')
-      .order('created_at', { ascending: false })
-      .limit(5);
-    
-    // Get category counts
-    const { data: categoryCounts } = await supabase
-      .from('articles')
-      .select('category_name')
-      .eq('status', 'published');
-    
-    const categoryStats = {};
-    if (categoryCounts) {
-      categoryCounts.forEach(article => {
-        const category = article.category_name;
-        categoryStats[category] = (categoryStats[category] || 0) + 1;
-      });
-    }
-    
-    res.json({
-      success: true,
-      data: {
-        totalArticles: totalArticles || 0,
-        totalUsers: totalUsers || 0,
-        recentArticles: recentArticles || [],
-        categoryCounts: categoryStats
-      }
-    });
-    
-  } catch (error) {
-    console.error('Error fetching statistics:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Gagal mengambil statistik'
-    });
-  }
-});
-
-// ==================== ADMIN ENDPOINTS ====================
-app.get('/api/admin/articles', authenticate, adminOnly, async (req, res) => {
-  try {
-    const { status = 'all' } = req.query;
-    
-    console.log('👑 [ADMIN] Fetching all articles, status:', status);
-    
-    let query = supabase
-      .from('articles')
-      .select('*')
-      .order('created_at', { ascending: false });
-    
-    if (status !== 'all') {
-      query = query.eq('status', status);
-    }
-    
-    const { data, error } = await query;
-    
-    if (error) {
-      console.error('❌ Admin fetch error:', error);
-      throw error;
-    }
-    
-    console.log(`✅ Found ${data?.length || 0} admin articles`);
-    
-    res.json({
-      success: true,
-      data: data || [],
-      count: data?.length || 0
-    });
-    
-  } catch (error) {
-    console.error('❌ Error in admin articles:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch admin articles'
-    });
-  }
-});
-
-app.get('/api/admin/articles/pending', authenticate, adminOnly, async (req, res) => {
-  try {
-    console.log('👑 [ADMIN] Fetching pending articles');
-    
-    const { data, error } = await supabase
-      .from('articles')
-      .select('*')
-      .eq('status', 'pending')
-      .order('created_at', { ascending: false });
-    
-    if (error) {
-      console.error('❌ Pending fetch error:', error);
-      throw error;
-    }
-    
-    console.log(`✅ Found ${data?.length || 0} pending articles`);
-    
-    res.json({
-      success: true,
-      data: data || [],
-      count: data?.length || 0
-    });
-    
-  } catch (error) {
-    console.error('❌ Error fetching pending articles:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch pending articles'
-    });
-  }
-});
-
-app.put('/api/admin/articles/:id/status', authenticate, adminOnly, async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { status } = req.body;
-    
-    console.log(`👑 [ADMIN] Updating article ${id} status to: ${status}`);
-    
-    if (!['published', 'pending', 'rejected'].includes(status)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Status tidak valid'
-      });
-    }
-    
-    // Check if article exists
-    const { data: article, error: fetchError } = await supabase
-      .from('articles')
-      .select('*')
-      .eq('id', id)
-      .single();
-    
-    if (fetchError || !article) {
-      return res.status(404).json({
-        success: false,
-        message: 'Artikel tidak ditemukan'
-      });
-    }
-    
-    // Update status
-    const { data, error } = await supabase
-      .from('articles')
-      .update({ 
-        status: status,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', id)
-      .select()
-      .single();
-    
-    if (error) throw error;
-    
-    console.log(`✅ Article ${id} status updated to ${status}`);
-    
-    res.json({
-      success: true,
-      message: `Status artikel berhasil diubah menjadi ${status}`,
-      data: data
-    });
-    
-  } catch (error) {
-    console.error('❌ Error updating article status:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Gagal mengubah status artikel'
-    });
-  }
-});
-
-app.post('/api/admin/articles/batch-status', authenticate, adminOnly, async (req, res) => {
-  try {
-    const { articleIds, status } = req.body;
-    
-    console.log(`👑 [ADMIN] Batch updating ${articleIds?.length || 0} articles to: ${status}`);
-    
-    if (!articleIds || !Array.isArray(articleIds) || articleIds.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'Tidak ada artikel yang dipilih'
-      });
-    }
-    
-    if (!['published', 'rejected'].includes(status)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Status tidak valid untuk batch update'
-      });
-    }
-    
-    // Update all articles
-    const { data, error } = await supabase
-      .from('articles')
-      .update({ 
-        status: status,
-        updated_at: new Date().toISOString()
-      })
-      .in('id', articleIds)
-      .select();
-    
-    if (error) throw error;
-    
-    console.log(`✅ Batch updated ${data?.length || 0} articles to ${status}`);
-    
-    res.json({
-      success: true,
-      message: `Berhasil mengubah status ${data?.length || 0} artikel`,
-      data: data
-    });
-    
-  } catch (error) {
-    console.error('❌ Error in batch update:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Gagal melakukan batch update'
-    });
-  }
-});
-
-app.get('/api/admin/statistics', authenticate, adminOnly, async (req, res) => {
-  try {
-    // Total articles by status
-    const { data: allArticles } = await supabase
-      .from('articles')
-      .select('status');
-    
-    const stats = {
-      total: 0,
-      published: 0,
-      pending: 0,
-      rejected: 0
-    };
-    
-    if (allArticles) {
-      stats.total = allArticles.length;
-      allArticles.forEach(article => {
-        if (article.status === 'published') stats.published++;
-        else if (article.status === 'pending') stats.pending++;
-        else if (article.status === 'rejected') stats.rejected++;
-      });
-    }
-    
-    // Recent pending articles
-    const { data: recentPending } = await supabase
-      .from('articles')
-      .select('*')
-      .eq('status', 'pending')
-      .order('created_at', { ascending: false })
-      .limit(5);
-    
-    res.json({
-      success: true,
-      data: {
-        articles: stats,
-        recentPending: recentPending || []
-      }
-    });
-    
-  } catch (error) {
-    console.error('Error fetching admin stats:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Gagal mengambil statistik admin'
-    });
-  }
+  
+  // Otherwise, serve the Next.js app
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 // ==================== ERROR HANDLING ====================
@@ -1235,19 +697,10 @@ app.use((err, req, res, next) => {
   });
 });
 
-app.use((req, res) => {
-  res.status(404).json({
-    success: false,
-    message: 'Endpoint tidak ditemukan',
-    path: req.originalUrl
-  });
-});
-
 // ==================== START SERVER ====================
-// Listen on all network interfaces for Railway
 const server = app.listen(PORT, '0.0.0.0', () => {
   console.log('\n' + '='.repeat(50));
-  console.log('✅ SEIJA Magazine API Server - Railway Ready');
+  console.log('✅ SEIJA Magazine Full Stack - Railway Ready');
   console.log(`🌐 URL: http://0.0.0.0:${PORT}`);
   console.log(`📡 Health: http://0.0.0.0:${PORT}/api/health`);
   console.log(`📦 Environment: ${process.env.NODE_ENV || 'development'}`);
@@ -1257,21 +710,4 @@ const server = app.listen(PORT, '0.0.0.0', () => {
 server.on('error', (error) => {
   console.error('❌ Server error:', error);
   process.exit(1);
-});
-
-// Handle graceful shutdown
-process.on('SIGTERM', () => {
-  console.log('SIGTERM received. Shutting down gracefully...');
-  server.close(() => {
-    console.log('Server closed.');
-    process.exit(0);
-  });
-});
-
-process.on('SIGINT', () => {
-  console.log('SIGINT received. Shutting down gracefully...');
-  server.close(() => {
-    console.log('Server closed.');
-    process.exit(0);
-  });
 });
